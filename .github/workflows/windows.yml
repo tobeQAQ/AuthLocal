@@ -1,0 +1,81 @@
+name: Windows build and tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate translations
+        run: python scripts/check-localization.py
+      - name: Core regression checks
+        run: dotnet run --project tests/LocalAuth.Tests -c Release
+      - name: Windows UI and clipboard regression checks
+        run: dotnet run --project tests/LocalAuth.Windows.Tests -c Release -r win-x64
+      - name: Build portable archive and per-user installer
+        shell: pwsh
+        run: ./build.ps1 -Installer -SkipTests
+      - name: Compile upgrade test fixture
+        shell: pwsh
+        run: |
+          $compiler = Resolve-Path .tools/InnoSetup/ISCC.exe
+          $publish = (Resolve-Path artifacts/publish/windows-x64).Path
+          $output = Join-Path $PWD 'artifacts/upgrade-test'
+          & $compiler /DAppVersion=1.5.0.1 "/DPublishDir=$publish" "/DPackageDir=$output" installer/AuthLocal.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture compilation failed.' }
+      - name: Test install, running-app block, upgrade and uninstall
+        shell: pwsh
+        run: ./tests/installer/Smoke.Tests.ps1 -Installer artifacts/packages/AuthLocal-1.5.0-windows-x64-setup.exe -UpgradeInstaller artifacts/upgrade-test/AuthLocal-1.5.0.1-windows-x64-setup.exe
+      - name: Upload tested Windows packages
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: AuthLocal-1.5.0-windows-x64
+          path: artifacts/packages/*
+          if-no-files-found: error
+  release:
+    needs: windows
+    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release AuthLocal for Windows ')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: AuthLocal-1.5.0-windows-x64
+          path: packages
+      - name: Publish tested Windows release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          @'
+          AuthLocal for Windows 1.5.0
+
+          - 修复复制后切窗、最小化或退出导致粘贴为空；移除全部自动清空剪贴板逻辑。
+          - 首页统一展示 2FA 和保存的密码，单击卡片复制；托盘常驻，私密条目按需解锁。
+          - 支持跟随系统、浅色、深色，以及简中、繁中、英文、法文、日文。
+          - 首次打开必须确认“不要保存重要密码”的提醒。
+          - 新增当前用户安装版，登记版本与卸载入口；升级和卸载保留数据。
+
+          安装版：下载 windows-x64-setup.exe。免安装版：解压 portable.zip 后运行 AuthLocal.exe。
+          更新前先从托盘退出旧版。程序面向 Windows 10/11 x64，自带 .NET。
+
+          These packages passed core, Windows UI/clipboard, localization, and installer upgrade/uninstall checks on a GitHub-hosted Windows runner before publication. See the workflow linked from the repository for logs.
+          '@ | Set-Content release-notes.txt -Encoding utf8
+          $packages = @(Get-ChildItem packages -File | Select-Object -ExpandProperty FullName)
+          gh release create v1.5.0 @packages --repo $env:GH_REPO --target $env:RELEASE_COMMIT --title 'AuthLocal for Windows 1.5.0' --notes-file release-notes.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
