@@ -1,0 +1,19 @@
+AuthLocal for Windows uses the .NET 10 runtime and Windows Desktop runtime
+provided by Microsoft. .NET is licensed under the MIT License; additional runtime
+components carry their respective licenses. License and runtime notices are in
+licenses/DOTNET-LICENSE.txt, licenses/DOTNET-THIRD-PARTY-NOTICES.txt and
+licenses/WINDOWS-DESKTOP-LICENSE.txt.
+https://github.com/dotnet/runtime
+https://github.com/dotnet/winforms
+
+ZXing.Net 0.16.11
+Copyright (c) ZXing.Net contributors and ZXing authors.
+Licensed under the Apache License, Version 2.0 (licenses/ZXING-LICENSE.txt).
+https://github.com/micjahn/ZXing.Net
+
+The setup package is built with the unmodified Inno Setup 7.1.1 compiler.
+Copyright (C) 1997-2026 Jordan Russell. All rights reserved.
+Portions Copyright (C) 2000-2026 Martijn Laan. All rights reserved.
+Its license is included as licenses/INNO-SETUP-LICENSE.txt.
+https://jrsoftware.org/
+https://github.com/jrsoftware/issrc

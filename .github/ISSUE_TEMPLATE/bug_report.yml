@@ -1,0 +1,25 @@
+name: Bug report / 问题反馈
+description: Report a reproducible problem using synthetic data.
+body:
+  - type: markdown
+    attributes:
+      value: Do not include real passwords, OTP seeds or vault files. 请勿提供真实密码、密钥或账户库。
+  - type: input
+    id: version
+    attributes:
+      label: Version and Windows version / 软件及 Windows 版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction / 复现步骤
+      description: Include whether the window was switched, minimized, locked or closed to tray.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior / 预期与实际表现
+    validations:
+      required: true
