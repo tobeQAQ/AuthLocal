@@ -21,9 +21,9 @@ Supports Windows 10 1809 / Windows 11 x64. Packages include the .NET runtime.
 Obtain releases from [Releases](https://github.com/tobeQAQ/AuthLocal/releases), or
 packages from successful [Windows Actions runs](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml).
 
-- `AuthLocal-1.5.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
-- `AuthLocal-1.5.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
-- `AuthLocal-1.5.0-windows-x64-SHA256SUMS.txt`: download checksums.
+- `AuthLocal-1.6.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
+- `AuthLocal-1.6.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
+- `AuthLocal-1.6.0-windows-x64-SHA256SUMS.txt`: download checksums.
 
 The portable package still keeps data in the current Windows user's application
 data directory. Binaries are currently unsigned.
@@ -42,6 +42,16 @@ Mark selected entries private to require a master password. Five characters,
 including five digits, are accepted. Private names remain visible on the home
 screen; their contents require unlocking. Private content locks on timeout,
 minimize, close-to-tray, Windows session lock or sleep.
+
+The tray menu offers **Quick copy favorites**: ordinary favorites copy directly;
+locked private favorites open the window and require unlocking. The menu lists up
+to 12 shortcuts and links to all favorites. It shows names without secrets.
+
+![Tray quick copy](docs/screenshots/tray.en.png)
+
+Reopening `AuthLocal.exe` restores the existing window and preserves any open
+editor. Card refreshes stop while hidden or minimized, then update immediately
+when restored. OTPs copied from the tray are generated at the current time.
 
 Closing the window keeps the app running in the system tray. Click the tray icon
 to reopen the home screen; right-click it to exit completely. The default private

@@ -87,6 +87,41 @@ internal static class Theme
         BorderColor = primary ? Primary : Border, Tag = primary ? "Primary" : null
     };
 
+    internal static ContextMenuStrip Menu() => new()
+    {
+        Font = Font(), BackColor = Surface, ForeColor = Ink,
+        Renderer = new ToolStripProfessionalRenderer(new MenuColors())
+    };
+
+    internal static void RefreshMenu(ContextMenuStrip menu)
+    {
+        menu.BackColor = Surface;
+        menu.ForeColor = Ink;
+        foreach (var item in menu.Items.OfType<ToolStripMenuItem>())
+        {
+            item.DropDown.BackColor = Surface;
+            item.DropDown.ForeColor = Ink;
+        }
+    }
+
+    private sealed class MenuColors : ProfessionalColorTable
+    {
+        public override Color ToolStripDropDownBackground => Surface;
+        public override Color MenuBorder => Border;
+        public override Color MenuItemBorder => Border;
+        public override Color MenuItemSelected => AccentLight;
+        public override Color MenuItemSelectedGradientBegin => AccentLight;
+        public override Color MenuItemSelectedGradientEnd => AccentLight;
+        public override Color MenuItemPressedGradientBegin => AccentLight;
+        public override Color MenuItemPressedGradientMiddle => AccentLight;
+        public override Color MenuItemPressedGradientEnd => AccentLight;
+        public override Color ImageMarginGradientBegin => Surface;
+        public override Color ImageMarginGradientMiddle => Surface;
+        public override Color ImageMarginGradientEnd => Surface;
+        public override Color SeparatorDark => Border;
+        public override Color SeparatorLight => Surface;
+    }
+
     internal static TextBox TextBox(int x, int y, int width, bool password = false) => new()
     {
         Location = new Point(x, y), Size = new Size(width, 34), Font = Font(11),

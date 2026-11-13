@@ -13,7 +13,9 @@ internal sealed class MainForm : Form
     private PrivateEntryIndex? _privateIndex;
     private bool _indexCacheFailed;
     private readonly ClipboardWriter _clipboard = new();
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 250 };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
+    private readonly System.Windows.Forms.Timer _copyFeedback = new() { Interval = 2000 };
+    private readonly IDisposable _activation;
     private readonly ActivityFilter _activity;
     private OpenVault? _vault;
     private AppSettings _settings;
@@ -34,7 +36,8 @@ internal sealed class MainForm : Form
     private bool _closing;
     private bool _exitRequested;
     private readonly NotifyIcon _tray = new();
-    private readonly ContextMenuStrip _trayMenu = new();
+    private readonly ContextMenuStrip _trayMenu = Theme.Menu();
+    private readonly ToolStripMenuItem _quickCopyMenu = new();
     private ContextMenuStrip? _accountMenu;
     private int _generation;
     private int _failedAttempts;
@@ -65,11 +68,15 @@ internal sealed class MainForm : Form
         _activity = new ActivityFilter(() => _lastActivity = Environment.TickCount64);
         Application.AddMessageFilter(_activity);
         _timer.Tick += (_, _) => Tick();
-        _timer.Start();
+        _copyFeedback.Tick += (_, _) => { _copyFeedback.Stop(); UpdateTrayLanguage(); };
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.UserPreferenceChanged += OnSystemAppearanceChanged;
-        Resize += (_, _) => { if (!Visible || WindowState == FormWindowState.Minimized) LockVault("已在最小化时锁定"); };
+        Resize += (_, _) =>
+        {
+            UpdateRefreshTimer();
+            if (!Visible || WindowState == FormWindowState.Minimized) LockVault("已在最小化时锁定");
+        };
         KeyDown += async (_, e) =>
         {
             if (e.Control && e.KeyCode == Keys.L) { LockVault("已锁定"); e.SuppressKeyPress = true; }
@@ -78,8 +85,10 @@ internal sealed class MainForm : Form
         };
         _trayMenu.Items.Add("打开首页", null, (_, _) => RestoreWindow());
         _trayMenu.Items.Add("锁定私密区", null, (_, _) => LockVault("已锁定"));
+        _trayMenu.Items.Add(_quickCopyMenu);
         _trayMenu.Items.Add(new ToolStripSeparator());
-        _trayMenu.Items.Add("退出 AuthLocal", null, (_, _) => { _exitRequested = true; Close(); });
+        _trayMenu.Items.Add("退出 AuthLocal", null, (_, _) => { _exitRequested = true; Close(); }).Name = "ExitApplication";
+        _trayMenu.Opening += (_, _) => BuildQuickCopyMenu();
         _tray.Icon = Icon ?? SystemIcons.Application;
         _tray.Text = UiText.T("AuthLocal · 单击打开首页");
         UiText.Apply(_trayMenu);
@@ -87,10 +96,14 @@ internal sealed class MainForm : Form
         _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) RestoreWindow(); };
         _tray.Visible = true;
         BuildMain();
+        _activation = ExistingInstance.Register(this, Path.GetDirectoryName(store.FilePath)!, RestoreWindow);
     }
 
     private void RestoreWindow()
     {
+        if (_closing) return;
+        var modal = OwnedForms.LastOrDefault(form => form.Visible && form.Modal);
+        if (modal is not null) { modal.Activate(); return; }
         _privateView = false;
         _favoritesOnly = false;
         _search?.Clear();
@@ -98,6 +111,21 @@ internal sealed class MainForm : Form
         Show();
         WindowState = FormWindowState.Normal;
         Activate();
+    }
+
+    private void UpdateRefreshTimer()
+    {
+        if (_closing) return;
+        _timer.Enabled = Visible && WindowState != FormWindowState.Minimized;
+        if (_timer.Enabled) Tick();
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (_closing) return;
+        if (!Visible && (_vault is not null || _busy)) LockVault("已收起至托盘并锁定");
+        UpdateRefreshTimer();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -208,7 +236,7 @@ internal sealed class MainForm : Form
             button.BorderColor = Theme.Navigation;
             lower.Controls.Add(button);
         }
-        var backupMenu = new ContextMenuStrip { Font = Theme.Font() };
+        var backupMenu = Theme.Menu();
         backupMenu.Items.Add("导出普通条目备份", null, async (_, _) => await ExportBackupAsync(false));
         backupMenu.Items.Add("导出私密条目备份", null, async (_, _) => await ExportBackupAsync(true));
         backupMenu.Items.Add(new ToolStripSeparator());
@@ -238,7 +266,7 @@ internal sealed class MainForm : Form
             if (_vault is null) await UnlockPrivateAsync();
             else LockVault("已锁定私密内容");
         };
-        var addMenu = new ContextMenuStrip { Font = Theme.Font() };
+        var addMenu = Theme.Menu();
         addMenu.Items.Add("动态验证码（手动 / 二维码）", null, async (_, _) => await EditAccountAsync());
         addMenu.Items.Add("保存密码", null, async (_, _) => await EditAccountAsync(passwordEntry: true));
         add.Disposed += (_, _) => addMenu.Dispose();
@@ -278,10 +306,61 @@ internal sealed class MainForm : Form
 
     private void UpdateTrayLanguage()
     {
+        Theme.RefreshMenu(_trayMenu);
         _trayMenu.Items[0].Text = UiText.T("打开首页");
         _trayMenu.Items[1].Text = UiText.T("锁定私密区");
-        _trayMenu.Items[3].Text = UiText.T("退出 AuthLocal");
-        _tray.Text = UiText.T("AuthLocal · 单击打开首页");
+        _quickCopyMenu.Text = UiText.T("快速复制收藏");
+        _trayMenu.Items["ExitApplication"]!.Text = UiText.T("退出 AuthLocal");
+        _tray.Text = UiText.T(_copyFeedback.Enabled ? "AuthLocal · 已复制" : "AuthLocal · 单击打开首页");
+    }
+
+    private void BuildQuickCopyMenu()
+    {
+        foreach (ToolStripItem item in _quickCopyMenu.DropDownItems.Cast<ToolStripItem>().ToArray()) item.Dispose();
+        var favorites = _ordinary.Accounts.Where(a => a.Favorite).Select(a => (Account: a, Private: false)).ToList();
+        var privateAccounts = _vault?.Document.Accounts ?? _privateIndex?.Entries.Select(e => e.ToLockedAccount()).ToList() ?? [];
+        favorites.AddRange(privateAccounts.Where(a => a.Favorite).Select(a => (Account: a, Private: true)));
+        foreach (var (account, isPrivate) in favorites.OrderBy(e => e.Account.Issuer, StringComparer.CurrentCultureIgnoreCase)
+                     .ThenBy(e => e.Account.Name, StringComparer.CurrentCultureIgnoreCase).Take(12))
+        {
+            var id = account.Id; // Keep only the ID in callbacks, never a captured secret.
+            var title = account.Issuer.Length == 0 ? account.Name : account.Name.Length == 0 ? account.Issuer : account.Issuer + " · " + account.Name;
+            title = (isPrivate ? UiText.T("[私密] ") : "") + title.Replace('\r', ' ').Replace('\n', ' ');
+            var textElements = new System.Globalization.StringInfo(title);
+            if (textElements.LengthInTextElements > 70) title = textElements.SubstringByTextElements(0, 70) + "…";
+            var item = new ToolStripMenuItem(title.Replace("&", "&&")) { Tag = "UserContent" };
+            item.Click += (_, _) => BeginInvoke(async () => await CopyFavoriteAsync(id));
+            _quickCopyMenu.DropDownItems.Add(item);
+        }
+        if (favorites.Count == 0) _quickCopyMenu.DropDownItems.Add(new ToolStripMenuItem(UiText.T("还没有收藏条目")) { Enabled = false });
+        else
+        {
+            _quickCopyMenu.DropDownItems.Add(new ToolStripSeparator());
+            _quickCopyMenu.DropDownItems.Add(UiText.T("在首页查看全部收藏"), null, (_, _) =>
+            {
+                RestoreWindow();
+                _favoritesOnly = true;
+                RenderCards();
+            });
+        }
+    }
+
+    private async Task CopyFavoriteAsync(Guid id)
+    {
+        if (_closing || _busy) return;
+        if (OwnedForms.Any(form => form.Visible && form.Modal)) { RestoreWindow(); return; }
+        var account = FindAvailable(id);
+        if (account is null)
+        {
+            var cached = _privateIndex?.Entries.FirstOrDefault(e => e.Id == id && e.Favorite);
+            if (cached is null) return;
+            RestoreWindow();
+            account = await ResolveCardAsync(cached.ToLockedAccount());
+        }
+        if (account?.Favorite != true || !CopyCode(account)) return;
+        _copyFeedback.Stop();
+        _copyFeedback.Start();
+        UpdateTrayLanguage();
     }
 
     private const string DefaultStatus = "单击卡片复制 · 剪贴板由你自行替换 · Ctrl+L 锁定私密内容";
@@ -385,17 +464,19 @@ internal sealed class MainForm : Form
         foreach (var card in _cards.Controls.OfType<CodeCard>()) if (card.Width != width) card.Width = width;
     }
 
-    private void CopyCode(Account account)
+    private bool CopyCode(Account account)
     {
         var available = FindAvailable(account.Id);
-        if (available is null) return;
+        if (available is null) return false;
         try
         {
             _clipboard.Copy(available.IsPassword ? available.Secret : Totp.Generate(available, DateTimeOffset.UtcNow), Handle);
             _cards?.Controls.OfType<CodeCard>().FirstOrDefault(c => c.Account.Id == available.Id)?.ShowCopied();
             Toast(available.IsPassword ? "密码已复制，可直接切换窗口粘贴。" : "验证码已复制，可直接切换窗口粘贴。");
+            return true;
         }
         catch (System.Runtime.InteropServices.ExternalException) { ShowError("剪贴板正被其他程序使用，请稍后再试。"); }
+        return false;
     }
 
     private void ToggleFavorite(Account account)
@@ -410,7 +491,7 @@ internal sealed class MainForm : Form
         if (_busy || FindAvailable(account.Id) is null) return;
         var isPrivate = IsPrivate(account);
         _accountMenu?.Dispose();
-        var menu = new ContextMenuStrip { Font = Theme.Font() };
+        var menu = Theme.Menu();
         _accountMenu = menu;
         menu.Items.Add("编辑条目", null, (_, _) => BeginInvoke(async () => await EditAccountAsync(account)));
         menu.Items.Add(account.Favorite ? "取消收藏" : "收藏条目", null, (_, _) => BeginInvoke(() => ToggleFavorite(account)));
@@ -791,6 +872,9 @@ internal sealed class MainForm : Form
     {
         _closing = true;
         _generation++;
+        _activation.Dispose();
+        _copyFeedback.Stop();
+        _copyFeedback.Dispose();
         _tray.Visible = false;
         _tray.Dispose();
         _trayMenu.Dispose();
