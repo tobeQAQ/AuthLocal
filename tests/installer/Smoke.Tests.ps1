@@ -2,8 +2,8 @@
 param(
     [Parameter(Mandatory)][string]$Installer,
     [Parameter(Mandatory)][string]$UpgradeInstaller,
-    [string]$ExpectedVersion = '1.5.0',
-    [string]$UpgradeVersion = '1.5.0.1'
+    [Parameter(Mandatory)][string]$ExpectedVersion,
+    [Parameter(Mandatory)][string]$UpgradeVersion
 )
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'Installer smoke checks require Windows.' }

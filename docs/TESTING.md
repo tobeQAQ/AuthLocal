@@ -27,12 +27,12 @@ Private contents must still lock while already copied text remains available.
 | Check | Coverage |
 | --- | --- |
 | Core suite | 73 checks: RFC 6238, Base32/URI validation, encryption/tamper handling, atomic storage, five-digit master password, protection-transfer order and rollback |
-| Windows suite | 139 checks: editor/save/restart, DPAPI, unified home, private metadata/index recovery, authenticated copy, cancellation, tray, clipboard matrix, theme/language persistence and first-use warning |
-| Localization validator | 231 message IDs in four translated catalogs; matching IDs, format placeholders and native file-dialog filter pairs |
+| Windows suite | 176 checks: editor/save/restart, DPAPI, unified home, private metadata/index recovery, authenticated copy, cancellation, tray, clipboard matrix, theme/language persistence, first-use warning, cross-process restore, tray favorite copy and paused background refresh |
+| Localization validator | 234 message IDs in four translated catalogs; matching IDs, format placeholders and native file-dialog filter pairs |
 | Installer smoke suite | Per-user deployment/registry, running-app replacement block, version upgrade with one uninstall entry, byte-preserved account files/settings, uninstall and retained data |
 | Visual review | Light/dark home, all five languages at narrow size, settings and first-use warning; synthetic accounts only |
 
-## Recorded local validation (2026-11-11)
+## Recorded validation
 
 Core checks passed on .NET SDK 10.0.403. Windows desktop checks passed under Wine
 10 on Linux with a virtual display. The actual installed executable displayed its
@@ -42,7 +42,12 @@ data preservation.
 
 Wine-specific .NET cryptography compatibility settings were confined to the test
 environment. No Wine workaround is shipped in the application or installer.
-These results are not physical Windows 10/11 testing.
+These local compatibility results are not physical Windows 10/11 testing.
+
+Version 1.5.0 also passed all checks on the real GitHub-hosted Windows Server 2025
+runner: [successful run](https://github.com/tobeQAQ/AuthLocal/actions/runs/43079906607).
+The 1.6.0 extension passed 176 local desktop checks on 2026-11-13 before upload;
+its native Windows result is recorded by the release workflow.
 
 The [Windows workflow](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml)
 runs the core and desktop suites, validates translations, builds both packages,
@@ -63,8 +68,9 @@ python scripts/check-localization.py
 Allow the Windows suite's real 31-second timer to finish. Do not interact with its
 windows or change the clipboard while it runs. The suite restores the previous
 system appearance preference. Installer tests use a second setup compiled with
-version `1.5.0.1` only to verify upgrade metadata; that fixture is never published
-as a release.
+an older published installer selected by `scripts/Get-UpgradeBaseline.ps1`,
+validated against its SHA256 asset digest. The actual new installer is used as
+the upgrade target; there is no synthetic higher-version release fixture.
 
 Manual Windows checks that remain useful include high-DPI/multi-monitor placement,
 the physical taskbar overflow tray, and OS-specific title-bar/SmartScreen behavior.

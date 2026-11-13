@@ -24,6 +24,12 @@ internal static class Program
         }
         catch (IOException)
         {
+            // The first process may still be creating its warning/main window.
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                if (ExistingInstance.TryActivate(DataDirectory)) return;
+                Thread.Sleep(100);
+            }
             UiText.Message("AuthLocal 已在运行，请切换到已打开的窗口。", "AuthLocal", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }

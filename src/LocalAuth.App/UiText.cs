@@ -61,7 +61,7 @@ internal static class UiText
     {
         foreach (ToolStripItem item in items)
         {
-            item.Text = T(item.Text ?? "");
+            if (!Equals(item.Tag, "UserContent")) item.Text = T(item.Text ?? "");
             if (item is ToolStripDropDownItem dropdown) ApplyItems(dropdown.DropDownItems);
         }
     }

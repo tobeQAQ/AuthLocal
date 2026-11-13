@@ -1,6 +1,6 @@
 ; Stable per-user identity. Never change AppId when releasing an upgrade.
 #ifndef AppVersion
-  #define AppVersion "1.5.0"
+  #define AppVersion "1.6.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\windows-x64"

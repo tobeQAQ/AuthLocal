@@ -17,8 +17,13 @@ internal static partial class Program
     private static readonly string Temporary = Path.Combine(Path.GetTempPath(), "LocalAuth-ui-tests-" + Guid.NewGuid().ToString("N"));
 
     [STAThread]
-    private static void Main()
+    private static void Main(string[] arguments)
     {
+        if (arguments is ["--activate", var directory])
+        {
+            Environment.ExitCode = (bool)Static(App.GetType("LocalAuth.App.ExistingInstance")!, "TryActivate", directory)! ? 0 : 1;
+            return;
+        }
         ApplicationConfiguration.Initialize();
         Directory.CreateDirectory(Temporary);
         var form = CreateForm(Path.Combine(Temporary, "new"));
@@ -186,6 +191,7 @@ internal static partial class Program
         Check(!Get<bool>(form, "_privateView") && Cards(form).Count() == 2, "tray restore always opens homepage with all cards");
         await RunClipboardChecks();
         await RunPreferenceChecks();
+        await RunConvenienceChecks();
         // DPAPI corruption must reject without overwriting the original bytes.
         File.WriteAllBytes(ordinaryPath, new byte[] { 0, 1, 2, 3 });
         try
@@ -197,7 +203,7 @@ internal static partial class Program
         {
             Check(File.ReadAllBytes(ordinaryPath).SequenceEqual(new byte[] { 0, 1, 2, 3 }), "corrupt ordinary file rejects without overwriting data");
         }
-        ((ToolStripMenuItem)menu.Items[3]).PerformClick();
+        ((ToolStripMenuItem)menu.Items["ExitApplication"]!).PerformClick();
         Check(form.IsDisposed, "tray Exit closes and disposes the window");
     }
 

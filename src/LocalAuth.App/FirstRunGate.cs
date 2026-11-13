@@ -7,6 +7,7 @@ internal static class FirstRunGate
         var settings = AppSettings.Load(settingsPath);
         if (!settings.NeedsDisclaimer) return true;
         using var dialog = new FirstRunDialog();
+        using var activation = ExistingInstance.Register(dialog, Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, () => dialog.Activate());
         if (dialog.ShowDialog() != DialogResult.OK) return false;
         (AppSettings.Load(settingsPath) with { DisclaimerVersion = 1 }).Save(settingsPath);
         return true;

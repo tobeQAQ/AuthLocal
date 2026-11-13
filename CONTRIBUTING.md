@@ -16,8 +16,11 @@ expiry. Let it finish without changing the clipboard or interacting with its
 windows. It restores the test user's prior system theme preference.
 
 For an installer, use Inno Setup 7 and `./build.ps1 -Installer -IsccPath <ISCC.exe>`.
-The workflow installs a checksum-verified compiler and tests install, upgrade
-registration and uninstall before uploading packages.
+The workflow installs a checksum-verified compiler and downloads an older
+published installer with its GitHub asset SHA256 digest. It tests upgrading that
+actual release to the new package, registration and uninstall before uploading
+packages. Local baseline selection uses GitHub CLI and PowerShell 7 via
+`scripts/Get-UpgradeBaseline.ps1`.
 
 Keep changes focused. Include the trigger, expected behavior, and validation in
 pull requests. Add regression checks for behavior bugs, especially save failures,
