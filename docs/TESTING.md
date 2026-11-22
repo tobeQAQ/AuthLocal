@@ -27,8 +27,8 @@ Private contents must still lock while already copied text remains available.
 | Check | Coverage |
 | --- | --- |
 | Core suite | 73 checks: RFC 6238, Base32/URI validation, encryption/tamper handling, atomic storage, five-digit master password, protection-transfer order and rollback |
-| Windows suite | 176 checks: editor/save/restart, DPAPI, unified home, private metadata/index recovery, authenticated copy, cancellation, tray, clipboard matrix, theme/language persistence, first-use warning, cross-process restore, tray favorite copy and paused background refresh |
-| Localization validator | 234 message IDs in four translated catalogs; matching IDs, format placeholders and native file-dialog filter pairs |
+| Windows suite | 195 checks covering storage, private unlocking, clipboard persistence, tray and window restoration, search, type filters, keyboard copy and IME composition |
+| Localization validator | 239 message IDs in four translated catalogs with checks for matching IDs, format placeholders and native file-dialog filter pairs |
 | Installer smoke suite | Per-user deployment/registry, running-app replacement block, version upgrade with one uninstall entry, byte-preserved account files/settings, uninstall and retained data |
 | Visual review | Light/dark home, all five languages at narrow size, settings and first-use warning; synthetic accounts only |
 
@@ -46,8 +46,12 @@ These local compatibility results are not physical Windows 10/11 testing.
 
 Version 1.5.0 also passed all checks on the real GitHub-hosted Windows Server 2025
 runner: [successful run](https://github.com/tobeQAQ/AuthLocal/actions/runs/43079906607).
-The 1.6.0 extension passed 176 local desktop checks on 2026-11-13 before upload;
-its native Windows result is recorded by the release workflow.
+Version 1.6.0 passed its [GitHub Windows checks](https://github.com/tobeQAQ/AuthLocal/actions/runs/43491363021).
+
+Version 1.7.0 adds 19 desktop checks for multiscript search, type filters and
+keyboard copy. They exercise WinForms command processing and paste into a separate
+text box. They cover ambiguous results, a query change before a queued copy runs,
+IME composition, and cancellation or completion of private unlocking.
 
 The [Windows workflow](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml)
 runs the core and desktop suites, validates translations, builds both packages,

@@ -20,9 +20,9 @@
 
 | 文件 | 用法 |
 | --- | --- |
-| `AuthLocal-1.6.0-windows-x64-setup.exe` | 推荐。为当前用户安装，创建开始菜单入口并登记卸载信息 |
-| `AuthLocal-1.6.0-windows-x64-portable.zip` | 解压后运行 `AuthLocal.exe`，不登记安装信息 |
-| `AuthLocal-1.6.0-windows-x64-SHA256SUMS.txt` | 校验下载文件 |
+| `AuthLocal-1.7.0-windows-x64-setup.exe` | 推荐。为当前用户安装，创建开始菜单入口并登记卸载信息 |
+| `AuthLocal-1.7.0-windows-x64-portable.zip` | 解压后运行 `AuthLocal.exe`，不登记安装信息 |
+| `AuthLocal-1.7.0-windows-x64-SHA256SUMS.txt` | 校验下载文件 |
 
 压缩包版的“portable”指程序免安装，数据仍保存在当前 Windows 用户目录。发布包尚无代码签名证书。
 
@@ -47,9 +47,14 @@
 
 | 快捷键 | 操作 |
 | --- | --- |
-| Ctrl+F | 搜索 |
+| Ctrl+F | 聚焦搜索框 |
+| ↑ / ↓ | 在搜索结果间选中卡片 |
+| Enter | 复制选中卡片或唯一搜索结果 |
+| Esc | 清空搜索 |
 | Ctrl+N | 添加验证码 |
 | Ctrl+L | 锁定私密内容 |
+
+可以把服务名和账号的一部分用空格隔开一起搜，也可以用搜索框右侧的「全部类型」切换到验证码或密码。
 
 首页采用紧凑侧栏与工具栏，卡片直接排列在搜索框下方。布局参考 [Clash Verge 的项目预览](https://github.com/clash-verge-rev/clash-verge-rev#preview)，使用本项目自己的实现与配色。
 

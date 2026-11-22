@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using LocalAuth.Core;
 using Microsoft.Win32;
@@ -6,6 +7,8 @@ namespace LocalAuth.App;
 
 internal sealed class MainForm : Form
 {
+    private enum EntryType { All, Codes, Passwords }
+
     private readonly VaultStore _store;
     private readonly QuickAccessStore _ordinaryStore;
     private VaultDocument _ordinary;
@@ -22,7 +25,9 @@ internal sealed class MainForm : Form
     private readonly string _settingsPath;
     private Panel _root = null!;
     private FlowLayoutPanel? _cards;
-    private TextBox? _search;
+    private SearchBox? _search;
+    private RoundedButton? _typeButton;
+    private EntryType _entryType;
     private Label? _subtitle;
     private Label? _status;
     private RoundedButton? _allButton;
@@ -81,7 +86,11 @@ internal sealed class MainForm : Form
         {
             if (e.Control && e.KeyCode == Keys.L) { LockVault("已锁定"); e.SuppressKeyPress = true; }
             else if (e.Control && e.KeyCode == Keys.N) { e.SuppressKeyPress = true; await EditAccountAsync(); }
-            else if (e.Control && e.KeyCode == Keys.F) { _search?.Focus(); e.SuppressKeyPress = true; }
+            else if (e.Control && e.KeyCode == Keys.F)
+            {
+                e.SuppressKeyPress = true;
+                if (_search?.Focus() == true) _search.SelectAll();
+            }
         };
         _trayMenu.Items.Add("打开首页", null, (_, _) => RestoreWindow());
         _trayMenu.Items.Add("锁定私密区", null, (_, _) => LockVault("已锁定"));
@@ -104,13 +113,61 @@ internal sealed class MainForm : Form
         if (_closing) return;
         var modal = OwnedForms.LastOrDefault(form => form.Visible && form.Modal);
         if (modal is not null) { modal.Activate(); return; }
-        _privateView = false;
-        _favoritesOnly = false;
-        _search?.Clear();
-        RenderCards();
+        ResetHome();
         Show();
         WindowState = FormWindowState.Normal;
         Activate();
+    }
+
+    private void ResetHome()
+    {
+        _privateView = false;
+        _favoritesOnly = false;
+        _entryType = EntryType.All;
+        if (_search is { TextLength: > 0 }) _search.Clear();
+        else RenderCards();
+    }
+
+    protected override bool ProcessCmdKey(ref Message message, Keys keyData)
+    {
+        if (keyData is not (Keys.Up or Keys.Down or Keys.Enter or Keys.Escape) || _closing ||
+            _search is not { IsComposing: false } search || _cards is not { } list || (!search.Focused && !list.ContainsFocus))
+            return base.ProcessCmdKey(ref message, keyData);
+
+        if (keyData == Keys.Escape)
+        {
+            search.Focus();
+            search.Clear();
+            return true;
+        }
+
+        var cards = list.Controls.OfType<CodeCard>().ToArray();
+        var focusedIndex = Array.FindIndex(cards, card => card.Focused);
+        if (keyData == Keys.Enter)
+        {
+            // Holding Enter is one copy action, even if an unlock dialog is needed.
+            if ((message.LParam.ToInt64() & (1L << 30)) != 0) return true;
+            var hasQuery = !string.IsNullOrWhiteSpace(search.Text);
+            var target = focusedIndex >= 0 ? cards[focusedIndex] : hasQuery && cards.Length == 1 ? cards[0] : null;
+            if (target is not null)
+            {
+                BeginInvoke(async () =>
+                {
+                    if (!_closing && Visible && WindowState != FormWindowState.Minimized && !target.IsDisposed &&
+                        !OwnedForms.Any(form => form.Visible && form.Modal))
+                        await CopyFromCardAsync(target.Account);
+                });
+            }
+            else if (cards.Length > 1) Toast("用 ↑↓ 选择条目，再按 Enter 复制。");
+            return true;
+        }
+
+        if (cards.Length == 0) return true;
+        var next = keyData == Keys.Down ? Math.Min(focusedIndex + 1, cards.Length - 1)
+            : focusedIndex < 0 ? cards.Length - 1 : focusedIndex - 1;
+        if (next < 0) search.Focus();
+        else if (cards[next].Focus()) list.ScrollControlIntoView(cards[next]);
+        return true;
     }
 
     private void UpdateRefreshTimer()
@@ -155,6 +212,7 @@ internal sealed class MainForm : Form
     {
         _cards = null;
         _search = null;
+        _typeButton = null;
         _subtitle = null;
         _status = null;
         _allButton = null;
@@ -205,6 +263,8 @@ internal sealed class MainForm : Form
 
     private void BuildMain()
     {
+        var query = _search?.Text ?? "";
+        var searchFocused = _search?.Focused == true;
         NewRoot();
         AcceptButton = null;
         var sidebar = new BufferedPanel { Dock = DockStyle.Left, Width = 184, BackColor = Theme.Navigation };
@@ -271,16 +331,38 @@ internal sealed class MainForm : Form
         addMenu.Items.Add("保存密码", null, async (_, _) => await EditAccountAsync(passwordEntry: true));
         add.Disposed += (_, _) => addMenu.Dispose();
         add.Click += (_, _) => { UiText.Apply(addMenu); addMenu.Show(add, new Point(0, add.Height)); };
-        _search = Scaled(Theme.TextBox(0, 68, 500));
-        _search.PlaceholderText = "搜索条目…   Ctrl+F";
-        _search.AccessibleName = "搜索账户";
+        _search = Scaled(new SearchBox
+        {
+            Location = new Point(0, 68), Width = 500, Text = query,
+            PlaceholderText = "搜索服务或账号…   Ctrl+F", AccessibleName = "搜索账户",
+            AccessibleDescription = UiText.T("↑↓ 选择 · Enter 复制 · Esc 清空")
+        });
+        var searchHint = Scaled(Theme.Label("↑↓ 选择 · Enter 复制 · Esc 清空", 0, 96, 480, 18, 8, Theme.Muted));
+        searchHint.Visible = false;
+        _search.Enter += (_, _) => searchHint.Visible = true;
+        _search.Leave += (_, _) => searchHint.Visible = false;
         _search.TextChanged += (_, _) => RenderCards();
-        header.Controls.AddRange([heading, _subtitle, add, _privateAction, _search]);
+        var typeButton = Scaled(Theme.Button("全部类型", 0, 64, 132));
+        typeButton.Height = S(34);
+        _typeButton = typeButton;
+        var typeMenu = Theme.Menu();
+        foreach (var type in Enum.GetValues<EntryType>())
+        {
+            var item = new ToolStripMenuItem(TypeName(type));
+            item.Click += (_, _) => { _entryType = type; RenderCards(); };
+            typeMenu.Opening += (_, _) => item.Checked = _entryType == type;
+            typeMenu.Items.Add(item);
+        }
+        typeButton.ContextMenuStrip = typeMenu;
+        typeButton.Disposed += (_, _) => typeMenu.Dispose();
+        typeButton.Click += (_, _) => typeMenu.Show(typeButton, new Point(typeButton.Width, typeButton.Height), ToolStripDropDownDirection.BelowLeft);
+        header.Controls.AddRange([heading, _subtitle, add, _privateAction, _search, typeButton, searchHint]);
         header.Resize += (_, _) =>
         {
             add.Location = new Point(header.ClientSize.Width - add.Width - S(2), S(16));
             _privateAction.Location = new Point(add.Left - _privateAction.Width - S(10), S(16));
-            _search.Width = Math.Max(S(220), header.ClientSize.Width - S(2));
+            typeButton.Location = new Point(header.ClientSize.Width - typeButton.Width - S(2), S(64));
+            _search.Width = Math.Max(S(220), typeButton.Left - S(10));
             _subtitle.Width = Math.Max(S(40), _privateAction.Left - _subtitle.Left - S(10));
         };
         var footer = new BufferedPanel { Dock = DockStyle.Bottom, Height = S(30), BackColor = Theme.Background };
@@ -302,6 +384,7 @@ internal sealed class MainForm : Form
         RenderCards();
         UiText.Apply(_root);
         UpdateTrayLanguage();
+        if (searchFocused) _search.Focus();
     }
 
     private void UpdateTrayLanguage()
@@ -391,16 +474,19 @@ internal sealed class MainForm : Form
     private void RenderCards()
     {
         if (_cards is null) return;
-        var query = _search?.Text.Trim() ?? "";
+        var terms = (_search?.Text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var focusedId = _cards.Controls.OfType<CodeCard>().FirstOrDefault(card => card.Focused)?.Account.Id;
         var entries = new List<(Account Account, bool Private, bool Locked)>();
         if (!_privateView) entries.AddRange(_ordinary.Accounts.Select(a => (a, false, false)));
         if (_vault is not null) entries.AddRange(_vault.Document.Accounts.Select(a => (a, true, false)));
         else if (_privateIndex is not null) entries.AddRange(_privateIndex.Entries.Select(e => (e.ToLockedAccount(), true, true)));
         var visible = entries.Where(e => (!_favoritesOnly || e.Account.Favorite) &&
-                (query.Length == 0 || e.Account.Issuer.Contains(query, StringComparison.OrdinalIgnoreCase) || e.Account.Name.Contains(query, StringComparison.OrdinalIgnoreCase)))
+                (_entryType == EntryType.All || e.Account.IsPassword == (_entryType == EntryType.Passwords)) &&
+                MatchesSearch(e.Account, terms))
             .OrderByDescending(e => e.Account.Favorite).ThenBy(e => e.Account.Issuer, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(e => e.Account.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         _subtitle!.Text = UiText.F("{0} · {1} 项", UiText.T(_privateView ? "私密" : _favoritesOnly ? "收藏" : "全部"), visible.Count);
+        if (_typeButton is not null) _typeButton.Text = TypeName(_entryType) + " ▼";
         if (_privateAction is not null)
         {
             _privateAction.Text = UiText.T(_vault is not null ? "锁定私密" : NeedsPrivateIndex ? "解锁并同步" : "解锁私密");
@@ -409,7 +495,7 @@ internal sealed class MainForm : Form
                 ? "解锁一次以同步私密条目名称。普通条目可直接使用。" : _vault is null ? "输入主密码查看和复制私密内容。" : "锁定私密内容，普通条目仍可使用。Ctrl+L"));
         }
         if (_status is not null && Environment.TickCount64 >= _statusUntil) _status.Text = UiText.T(CurrentStatus);
-        foreach (var (button, active) in new[] { (_allButton!, !_privateView), (_privateButton!, _privateView), (_favoriteButton!, _favoritesOnly) })
+        foreach (var (button, active) in new[] { (_allButton!, !_privateView && !_favoritesOnly), (_privateButton!, _privateView), (_favoriteButton!, _favoritesOnly) })
         {
             button.Fill = active ? Theme.AccentLight : Theme.Navigation;
             button.ForeColor = active ? Theme.Accent : Theme.Ink;
@@ -421,8 +507,9 @@ internal sealed class MainForm : Form
         if (visible.Count == 0)
         {
             var empty = new BufferedPanel { Size = new Size(S(620), S(130)), Margin = Padding.Empty };
-            var title = query.Length > 0 ? "没有找到匹配条目" : NeedsPrivateIndex ? "私密名称待同步" : _favoritesOnly ? "还没有收藏条目" : "还没有条目";
-            var help = query.Length > 0 ? "试试服务名称、邮箱或用户名。" : NeedsPrivateIndex
+            var filtered = terms.Length > 0 || _entryType != EntryType.All;
+            var title = filtered ? "没有找到匹配条目" : NeedsPrivateIndex ? "私密名称待同步" : _favoritesOnly ? "还没有收藏条目" : "还没有条目";
+            var help = filtered ? "试试其他关键词或切换条目类型。" : NeedsPrivateIndex
                 ? "点击右上角「解锁并同步」即可加载，普通条目无需解锁。" : _privateView
                 ? "添加条目时勾选「设为私密」，或从条目菜单移入。" : "点击右上角添加验证码或密码，单击卡片即可复制。";
             empty.Controls.Add(Scaled(Theme.Label(title, 4, 18, 600, 32, 15, style: FontStyle.Bold)));
@@ -439,6 +526,28 @@ internal sealed class MainForm : Form
         }
         _cards.ResumeLayout();
         SizeCards();
+        if (focusedId is not null && Visible && WindowState != FormWindowState.Minimized)
+        {
+            var card = _cards.Controls.OfType<CodeCard>().FirstOrDefault(c => c.Account.Id == focusedId);
+            if (card?.Focus() != true) _search?.Focus();
+        }
+    }
+
+    private static string TypeName(EntryType type) => UiText.T(type switch
+    {
+        EntryType.Codes => "仅验证码",
+        EntryType.Passwords => "仅密码",
+        _ => "全部类型"
+    });
+
+    private static bool MatchesSearch(Account account, string[] terms)
+    {
+        const CompareOptions options = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace | CompareOptions.IgnoreWidth;
+        var comparer = CultureInfo.InvariantCulture.CompareInfo;
+        foreach (var term in terms)
+            if (comparer.IndexOf(account.Issuer, term, options) < 0 && comparer.IndexOf(account.Name, term, options) < 0)
+                return false;
+        return true;
     }
 
     private async Task<Account?> ResolveCardAsync(Account account)
@@ -814,10 +923,7 @@ internal sealed class MainForm : Form
         foreach (var form in OwnedForms) form.Close();
         _vault?.Dispose();
         _vault = null;
-        _privateView = false;
-        _favoritesOnly = false;
-        _search?.Clear();
-        RenderCards();
+        ResetHome();
         Toast(UiText.T(reason) + UiText.T(" · 普通条目可直接使用"));
     }
 

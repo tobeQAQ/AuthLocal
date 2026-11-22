@@ -62,7 +62,7 @@ internal sealed class CodeCard : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var outline = Theme.Rounded(new RectangleF(1, 1, Width - 3, Height - 3), S(11));
         using var white = new SolidBrush(Theme.Surface);
-        using var border = new Pen(_hover || Focused ? Theme.Accent : Theme.Border);
+        using var border = new Pen(_hover || Focused ? Theme.Accent : Theme.Border, Focused ? 2 * scale : 1);
         g.FillPath(white, outline);
         g.DrawPath(border, outline);
         var initial = (Account.Issuer.Length > 0 ? Account.Issuer : Account.Name)[..1].ToUpperInvariant();

@@ -1,11 +1,14 @@
-AuthLocal for Windows 1.6.0
+AuthLocal for Windows 1.7.0
 
 首次打开请阅读并确认：不要在此保存重要密码。
 
-安装版：运行 AuthLocal-1.6.0-windows-x64-setup.exe。
+安装版：运行 AuthLocal-1.7.0-windows-x64-setup.exe。
 免安装版：解压后运行 AuthLocal.exe。无需安装 .NET。
 
 打开直接显示全部 2FA 和保存的密码。添加条目后单击卡片即可复制。
+按 Ctrl+F 搜索，可同时输入服务名和账号的关键词。
+用搜索框右侧菜单切换验证码或密码。只有一个搜索结果时按 Enter 复制，
+多个结果先用方向键选中卡片再回车。Esc 清空搜索。
 密码可包含字母、符号、中文和空格，复制时保留原文。
 切换窗口、最小化、锁定、等待和退出均不自动清空剪贴板。
 

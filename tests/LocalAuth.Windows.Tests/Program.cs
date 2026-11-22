@@ -192,6 +192,7 @@ internal static partial class Program
         await RunClipboardChecks();
         await RunPreferenceChecks();
         await RunConvenienceChecks();
+        await RunSearchChecks();
         // DPAPI corruption must reject without overwriting the original bytes.
         File.WriteAllBytes(ordinaryPath, new byte[] { 0, 1, 2, 3 });
         try

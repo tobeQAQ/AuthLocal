@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.0
+
+- 搜索支持同时输入服务名和账号中的关键词，也能匹配大小写、重音和全角差异。
+- 首页可筛选验证码或密码，搜索会在当前筛选范围内匹配。
+- 搜索只有一条结果时按 Enter 即可复制。有多个结果时先用 ↑↓ 选中卡片，再按 Enter。按 Esc 可清空搜索。
+- 私密结果通过同一个解锁流程复制。输入法选词时的按键留给输入法处理。
+
+Home search accepts multiple keywords across service and account names. Filter
+the results by type, select a card with the arrow keys, and press Enter to copy.
+Enter in the search box copies a single match. Private entries still require
+unlocking.
+
 ## 1.6.0
 
 - 再次双击程序会直接唤回已有窗口，包括托盘和最小化状态；首次提醒也能唤回。
