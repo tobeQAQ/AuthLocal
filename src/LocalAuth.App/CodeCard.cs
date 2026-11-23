@@ -8,9 +8,14 @@ internal sealed class CodeCard : Control
     internal Account Account { get; }
     private readonly bool _isPrivate;
     internal bool IsLocked { get; }
+    private EntryAppearance _appearance = new();
+    private Point? _dragStart;
+    private bool _dragged;
+    private bool? _dropAfter;
     internal event Action<Account>? CopyRequested;
     internal event Action<Account>? FavoriteRequested;
     internal event Action<Account, Point>? MenuRequested;
+    internal event Action<CodeCard>? ReorderRequested;
     private string _code = "";
     private int _remaining;
     private long _counter = -1;
@@ -54,6 +59,39 @@ internal sealed class CodeCard : Control
         Invalidate();
     }
 
+    internal void SetAppearance(EntryAppearance appearance) => _appearance = appearance;
+
+    internal void ShowDrop(bool? after)
+    {
+        if (_dropAfter == after) return;
+        _dropAfter = after;
+        Invalidate();
+    }
+
+    private Rectangle DragHandle => new(Width - ScalePixel(115), ScalePixel(8), ScalePixel(28), ScalePixel(36));
+    private int ScalePixel(int value) => (int)(value * DeviceDpi / 96f);
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        _dragged = false;
+        _dragStart = e.Button == MouseButtons.Left && DragHandle.Contains(e.Location) ? e.Location : null;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        Cursor = DragHandle.Contains(e.Location) ? Cursors.SizeAll : Cursors.Hand;
+        if (e.Button != MouseButtons.Left || _dragStart is not Point start) return;
+        var size = SystemInformation.DragSize;
+        if (new Rectangle(start.X - size.Width / 2, start.Y - size.Height / 2, size.Width, size.Height).Contains(e.Location)) return;
+        _dragStart = null;
+        _dragged = true;
+        ReorderRequested?.Invoke(this);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e) { _dragStart = null; base.OnMouseUp(e); }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -65,15 +103,26 @@ internal sealed class CodeCard : Control
         using var border = new Pen(_hover || Focused ? Theme.Accent : Theme.Border, Focused ? 2 * scale : 1);
         g.FillPath(white, outline);
         g.DrawPath(border, outline);
+        if (_dropAfter is bool after)
+        {
+            using var marker = new Pen(Theme.Accent, S(3));
+            var x = after ? Width - S(3) : S(3);
+            g.DrawLine(marker, x, S(16), x, Height - S(16));
+        }
         var initial = (Account.Issuer.Length > 0 ? Account.Issuer : Account.Name)[..1].ToUpperInvariant();
         using var iconPath = Theme.Rounded(new RectangleF(S(16), S(16), S(36), S(36)), S(11));
-        using var iconBrush = new SolidBrush(Theme.AccentLight);
+        using var iconBrush = new SolidBrush(_appearance.ColorIndex == 0 ? Theme.AccentLight : _appearance.Accent);
         g.FillPath(iconBrush, iconPath);
         using var iconFont = Theme.Font(14, FontStyle.Bold);
-        TextRenderer.DrawText(g, initial, iconFont, new Rectangle(S(16), S(16), S(36), S(36)), Theme.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        var iconInk = _appearance.ColorIndex == 0 ? Theme.Accent : Theme.IsDark ? Theme.Background : Color.White;
+        TextRenderer.DrawText(g, initial, iconFont, new Rectangle(S(16), S(16), S(36), S(36)), iconInk, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        using var grip = new SolidBrush(Theme.Muted);
+        for (var row = 0; row < 3; row++)
+            for (var column = 0; column < 2; column++)
+                g.FillEllipse(grip, DragHandle.Left + S(10 + column * 5), DragHandle.Top + S(11 + row * 5), S(3), S(3));
         using var titleFont = Theme.Font(11, FontStyle.Bold);
         using var detailFont = Theme.Font(8.5f);
-        var nameWidth = Math.Max(S(30), Width - S(144));
+        var nameWidth = Math.Max(S(30), DragHandle.Left - S(68));
         TextRenderer.DrawText(g, Account.Issuer.Length > 0 ? Account.Issuer : UiText.T("未命名服务"), titleFont,
             new Rectangle(S(64), S(12), nameWidth, S(25)), Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
         TextRenderer.DrawText(g, (_isPrivate ? UiText.T("[私密] ") : "") + Account.Name, detailFont,
@@ -90,7 +139,8 @@ internal sealed class CodeCard : Control
             new Rectangle(S(16), S(64), Width - S(112), S(43)), IsLocked ? Theme.Muted : !Account.IsPassword && _remaining <= 5 ? Theme.Warning : Theme.Accent,
             TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter);
         using var copyPath = Theme.Rounded(new RectangleF(Width - S(100), S(68), S(80), S(27)), S(6));
-        g.FillPath(iconBrush, copyPath);
+        using var copyBrush = new SolidBrush(Theme.AccentLight);
+        g.FillPath(copyBrush, copyPath);
         TextRenderer.DrawText(g, UiText.T(_showCopied ? "已复制" : IsLocked ? "解锁复制" : "点击复制"), detailFont,
             new Rectangle(Width - S(100), S(68), S(80), S(27)), Theme.Accent,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
@@ -111,10 +161,12 @@ internal sealed class CodeCard : Control
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
+        if (_dragged) return;
         Focus();
         var scale = DeviceDpi / 96f;
         if (e.Button == MouseButtons.Right || (e.X >= Width - 42 * scale && e.Y < 58 * scale))
             MenuRequested?.Invoke(Account, PointToScreen(e.Location));
+        else if (DragHandle.Contains(e.Location)) return;
         else if (e.X >= Width - 80 * scale && e.Y < 58 * scale) FavoriteRequested?.Invoke(Account);
         else if (e.Button == MouseButtons.Left) CopyRequested?.Invoke(Account);
     }

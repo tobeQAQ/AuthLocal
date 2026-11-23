@@ -5,7 +5,7 @@ using Microsoft.Win32;
 
 namespace LocalAuth.App;
 
-internal sealed class MainForm : Form
+internal sealed partial class MainForm : Form
 {
     private enum EntryType { All, Codes, Passwords }
 
@@ -55,6 +55,8 @@ internal sealed class MainForm : Form
         _store = store;
         _settingsPath = Path.Combine(Path.GetDirectoryName(store.FilePath)!, "settings.json");
         _settings = AppSettings.Load(_settingsPath);
+        _layoutPath = Path.Combine(Path.GetDirectoryName(store.FilePath)!, "entry-layout.local");
+        _layout = EntryLayout.Load(_layoutPath);
         UiText.UseLanguage(_settings.Language);
         Theme.SetMode(_settings.ThemeMode);
         _ordinaryStore = new QuickAccessStore(Path.Combine(Path.GetDirectoryName(store.FilePath)!, "ordinary.local"));
@@ -476,15 +478,9 @@ internal sealed class MainForm : Form
         if (_cards is null) return;
         var terms = (_search?.Text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var focusedId = _cards.Controls.OfType<CodeCard>().FirstOrDefault(card => card.Focused)?.Account.Id;
-        var entries = new List<(Account Account, bool Private, bool Locked)>();
-        if (!_privateView) entries.AddRange(_ordinary.Accounts.Select(a => (a, false, false)));
-        if (_vault is not null) entries.AddRange(_vault.Document.Accounts.Select(a => (a, true, false)));
-        else if (_privateIndex is not null) entries.AddRange(_privateIndex.Entries.Select(e => (e.ToLockedAccount(), true, true)));
-        var visible = entries.Where(e => (!_favoritesOnly || e.Account.Favorite) &&
+        var visible = OrderedEntries().Where(e => (!_privateView || e.Private) && (!_favoritesOnly || e.Account.Favorite) &&
                 (_entryType == EntryType.All || e.Account.IsPassword == (_entryType == EntryType.Passwords)) &&
-                MatchesSearch(e.Account, terms))
-            .OrderByDescending(e => e.Account.Favorite).ThenBy(e => e.Account.Issuer, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(e => e.Account.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+                MatchesSearch(e.Account, terms)).ToList();
         _subtitle!.Text = UiText.F("{0} · {1} 项", UiText.T(_privateView ? "私密" : _favoritesOnly ? "收藏" : "全部"), visible.Count);
         if (_typeButton is not null) _typeButton.Text = TypeName(_entryType) + " ▼";
         if (_privateAction is not null)
@@ -503,7 +499,11 @@ internal sealed class MainForm : Form
             button.Invalidate();
         }
         _cards.SuspendLayout();
-        foreach (var control in _cards.Controls.Cast<Control>().ToArray()) control.Dispose();
+        foreach (var control in _cards.Controls.Cast<Control>().ToArray())
+        {
+            _tooltips.SetToolTip(control, null);
+            control.Dispose();
+        }
         if (visible.Count == 0)
         {
             var empty = new BufferedPanel { Size = new Size(S(620), S(130)), Margin = Padding.Empty };
@@ -516,13 +516,33 @@ internal sealed class MainForm : Form
             empty.Controls.Add(Scaled(Theme.Label(help, 4, 60, 600, 44, 9.5f, Theme.Muted)));
             _cards.Controls.Add(empty);
         }
-        foreach (var entry in visible)
+        var groups = visible.GroupBy(e => _layout.For(e.Account.Id).Group, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key.Length == 0).ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var showHeadings = groups.Any(g => g.Key.Length > 0);
+        foreach (var group in groups)
         {
-            var card = new CodeCard(entry.Account, entry.Private, entry.Locked) { Height = S(132), Margin = new Padding(0, 0, S(12), S(12)) };
-            card.CopyRequested += async a => await CopyFromCardAsync(a);
-            card.FavoriteRequested += async a => { var available = await ResolveCardAsync(a); if (available is not null) ToggleFavorite(available); };
-            card.MenuRequested += async (a, point) => { var available = await ResolveCardAsync(a); if (available is not null) ShowAccountMenu(available, point); };
-            _cards.Controls.Add(card);
+            if (showHeadings)
+            {
+                var title = Scaled(Theme.Label("", 0, 0, 300, 30, 10, style: FontStyle.Bold));
+                title.Text = group.Key.Length == 0 ? UiText.T("未分组") : group.Key;
+                title.Tag = "UserContent";
+                _cards.Controls.Add(title);
+                _cards.SetFlowBreak(title, true);
+            }
+            CodeCard? last = null;
+            foreach (var entry in group)
+            {
+                var card = new CodeCard(entry.Account, entry.Private, entry.Locked) { Height = S(132), Margin = new Padding(0, 0, S(12), S(12)) };
+                card.SetAppearance(_layout.For(entry.Account.Id));
+                card.CopyRequested += async a => await CopyFromCardAsync(a);
+                card.FavoriteRequested += async a => { var available = await ResolveCardAsync(a); if (available is not null) ToggleFavorite(available); };
+                card.MenuRequested += ShowAccountMenu;
+                WireReordering(card);
+                _tooltips.SetToolTip(card, UiText.T("拖动卡片上的六点把手可排序"));
+                _cards.Controls.Add(card);
+                last = card;
+            }
+            if (last is not null) _cards.SetFlowBreak(last, true);
         }
         _cards.ResumeLayout();
         SizeCards();
@@ -571,6 +591,7 @@ internal sealed class MainForm : Form
         var columns = Math.Max(1, (available + S(12)) / S(332));
         var width = Math.Max(S(300), available / columns - S(12));
         foreach (var card in _cards.Controls.OfType<CodeCard>()) if (card.Width != width) card.Width = width;
+        foreach (var heading in _cards.Controls.OfType<Label>()) heading.Width = Math.Max(S(300), available - S(12));
     }
 
     private bool CopyCode(Account account)
@@ -597,28 +618,36 @@ internal sealed class MainForm : Form
 
     private void ShowAccountMenu(Account account, Point location)
     {
-        if (_busy || FindAvailable(account.Id) is null) return;
+        if (_busy || _closing) return;
+        var available = FindAvailable(account.Id);
+        if (available is null && _privateIndex?.Entries.Any(e => e.Id == account.Id) != true) return;
         var isPrivate = IsPrivate(account);
         _accountMenu?.Dispose();
         var menu = Theme.Menu();
         _accountMenu = menu;
-        menu.Items.Add("编辑条目", null, (_, _) => BeginInvoke(async () => await EditAccountAsync(account)));
-        menu.Items.Add(account.Favorite ? "取消收藏" : "收藏条目", null, (_, _) => BeginInvoke(() => ToggleFavorite(account)));
-        menu.Items.Add(isPrivate ? "移到普通区（无需密码）" : "设为私密（需要密码）", null, (_, _) => BeginInvoke(async () =>
+        if (available is null)
+            menu.Items.Add("解锁私密", null, (_, _) => BeginInvoke(async () => await UnlockPrivateAsync()));
+        else
         {
-            if (_busy || FindAvailable(account.Id) is null) return;
-            if (!isPrivate && !await UnlockPrivateAsync()) return;
-            if (FindAvailable(account.Id) is null) return;
-            if (MoveAccount(account, isPrivate))
-                Toast(isPrivate ? "已移到普通区，下次打开无需密码。" : "已设为私密，锁定后需密码才能使用。");
-        }));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("删除条目", null, (_, _) => BeginInvoke(() =>
-        {
-            if (_busy || FindAvailable(account.Id) is null) return;
-            if (UiText.Message(this, UiText.F("删除「{0} {1}」？\n\n删除后可从此前导出的加密备份恢复。", account.Issuer, account.Name), "删除条目", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes && FindAvailable(account.Id) is not null)
-                Commit(Section(isPrivate).Where(a => a.Id != account.Id).ToList(), isPrivate);
-        }));
+            menu.Items.Add("编辑条目", null, (_, _) => BeginInvoke(async () => await EditAccountAsync(account)));
+            menu.Items.Add(account.Favorite ? "取消收藏" : "收藏条目", null, (_, _) => BeginInvoke(() => ToggleFavorite(account)));
+            menu.Items.Add(isPrivate ? "移到普通区（无需密码）" : "设为私密（需要密码）", null, (_, _) => BeginInvoke(async () =>
+            {
+                if (_busy || FindAvailable(account.Id) is null) return;
+                if (!isPrivate && !await UnlockPrivateAsync()) return;
+                if (FindAvailable(account.Id) is null) return;
+                if (MoveAccount(account, isPrivate))
+                    Toast(isPrivate ? "已移到普通区，下次打开无需密码。" : "已设为私密，锁定后需密码才能使用。");
+            }));
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("删除条目", null, (_, _) => BeginInvoke(() =>
+            {
+                if (_busy || FindAvailable(account.Id) is null) return;
+                if (UiText.Message(this, UiText.F("删除「{0} {1}」？\n\n删除后可从此前导出的加密备份恢复。", account.Issuer, account.Name), "删除条目", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes && FindAvailable(account.Id) is not null)
+                    Commit(Section(isPrivate).Where(a => a.Id != account.Id).ToList(), isPrivate);
+            }));
+        }
+        menu.Items.Add("分组和颜色…", null, (_, _) => BeginInvoke(() => EditAppearance(account.Id)));
         menu.Closed += (_, _) =>
         {
             // Closed runs before the menu item finishes dispatching its click.

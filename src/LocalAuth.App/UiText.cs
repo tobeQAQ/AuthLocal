@@ -44,7 +44,7 @@ internal static class UiText
     internal static void Apply(Control root)
     {
         // Never translate user-entered text, including passwords and account names.
-        if (root is not TextBoxBase) root.Text = T(root.Text);
+        if (root is not TextBoxBase && !Equals(root.Tag, "UserContent")) root.Text = T(root.Text);
         if (root is TextBox input) input.PlaceholderText = T(input.PlaceholderText);
         if (root.AccessibleName is { } accessible) root.AccessibleName = T(accessible);
         if (root is ComboBox combo && !Equals(combo.Tag, "LanguageSelector"))

@@ -22,6 +22,7 @@ New-Item $temporary, $dataPath -ItemType Directory -Force | Out-Null
 $fixture = [byte[]](1, 3, 5, 7, 9, 11)
 [IO.File]::WriteAllBytes((Join-Path $dataPath 'accounts.vault'), $fixture)
 [IO.File]::WriteAllBytes((Join-Path $dataPath 'ordinary.local'), $fixture)
+[IO.File]::WriteAllBytes((Join-Path $dataPath 'entry-layout.local'), $fixture)
 '{"DisclaimerVersion":1,"ThemeMode":"Dark","Language":"fr","AutoLockMinutes":5}' |
     Set-Content (Join-Path $dataPath 'settings.json') -Encoding utf8
 $before = @(Get-ChildItem $dataPath -File | Get-FileHash | Select-Object -ExpandProperty Hash)

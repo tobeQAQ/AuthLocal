@@ -20,9 +20,9 @@
 
 | 文件 | 用法 |
 | --- | --- |
-| `AuthLocal-1.7.0-windows-x64-setup.exe` | 推荐。为当前用户安装，创建开始菜单入口并登记卸载信息 |
-| `AuthLocal-1.7.0-windows-x64-portable.zip` | 解压后运行 `AuthLocal.exe`，不登记安装信息 |
-| `AuthLocal-1.7.0-windows-x64-SHA256SUMS.txt` | 校验下载文件 |
+| `AuthLocal-1.8.0-windows-x64-setup.exe` | 推荐。为当前用户安装，创建开始菜单入口并登记卸载信息 |
+| `AuthLocal-1.8.0-windows-x64-portable.zip` | 解压后运行 `AuthLocal.exe`，不登记安装信息 |
+| `AuthLocal-1.8.0-windows-x64-SHA256SUMS.txt` | 校验下载文件 |
 
 压缩包版的“portable”指程序免安装，数据仍保存在当前 Windows 用户目录。发布包尚无代码签名证书。
 
@@ -56,6 +56,8 @@
 
 可以把服务名和账号的一部分用空格隔开一起搜，也可以用搜索框右侧的「全部类型」切换到验证码或密码。
 
+拖动卡片右上角六点把手，放到另一张卡片的左侧或右侧即可调整顺序，两张卡片分属不同组时会同时移动分组。卡片菜单「分组和颜色」可输入分组名称，并为单个条目选择颜色。留空可取消分组。排列保存在本机，重启会恢复。
+
 首页采用紧凑侧栏与工具栏，卡片直接排列在搜索框下方。布局参考 [Clash Verge 的项目预览](https://github.com/clash-verge-rev/clash-verge-rev#preview)，使用本项目自己的实现与配色。
 
 ## 升级与注册表
@@ -84,6 +86,7 @@
 | `private-index.local` | 私密名称、ID、类型及收藏状态索引，不含密码或 OTP 密钥 |
 | `accounts.vault.bak` | 私密区上一次保存的加密备份 |
 | `settings.json` | 主题、语言、锁定时长及首次提醒确认状态 |
+| `entry-layout.local` | 本机卡片顺序、分组与颜色，使用当前 Windows 用户加密。加密账户备份仍用于迁移凭据 |
 | `app.lock` | 单实例写入锁 |
 | `before-restore-*.vault` | 恢复前保留的加密副本 |
 

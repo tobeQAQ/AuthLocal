@@ -21,9 +21,9 @@ Supports Windows 10 1809 / Windows 11 x64. Packages include the .NET runtime.
 Obtain releases from [Releases](https://github.com/tobeQAQ/AuthLocal/releases), or
 packages from successful [Windows Actions runs](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml).
 
-- `AuthLocal-1.7.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
-- `AuthLocal-1.7.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
-- `AuthLocal-1.7.0-windows-x64-SHA256SUMS.txt`: download checksums.
+- `AuthLocal-1.8.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
+- `AuthLocal-1.8.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
+- `AuthLocal-1.8.0-windows-x64-SHA256SUMS.txt`: download checksums.
 
 The portable package still keeps data in the current Windows user's application
 data directory. Binaries are currently unsigned.
@@ -65,6 +65,12 @@ Use Ctrl+F to search by service and account keywords separated by spaces. The ty
 menu narrows results to codes or passwords. Enter copies a single search result.
 When several cards match, use ↑ or ↓ to select one and then press Enter. Esc clears
 the query. Ctrl+N adds a TOTP entry and Ctrl+L locks private content.
+Drag a card by its six-dot handle and drop it on the left or right half of
+another card to put it before or after that card. Dropping across groups also
+moves the entry to the destination group. Choose **Group and color** from the card
+menu to name a group or change the color of an individual entry. Layout preferences
+are stored on this Windows profile.
+
 The compact layout takes navigation and list placement inspiration from the
 [Clash Verge preview](https://github.com/clash-verge-rev/clash-verge-rev#preview),
 with its own implementation and colors.
@@ -91,6 +97,7 @@ For compatibility with earlier LocalAuth releases, data remains at
 | `private-index.local` | Home screen names, types, IDs and favorite flags, without secrets |
 | `accounts.vault.bak` | Previous encrypted private-vault save |
 | `settings.json` | Appearance, language, timeout and warning acknowledgement |
+| `entry-layout.local` | Card order, group labels and colors, encrypted for the current Windows user |
 | `app.lock` | Single-instance write lock |
 
 Use the Backup and restore menu to export **both** ordinary and private entries.

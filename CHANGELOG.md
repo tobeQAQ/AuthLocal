@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+
+- 拖动卡片右上角的六点把手，可调整顺序或把条目移到另一组。
+- 卡片菜单新增「分组和颜色」，支持自定义分组名称和每张卡片的颜色。
+- 排列、分组和颜色保存在本机，重启后恢复。锁定中的私密条目也可以整理。
+
+Drag a card by its six-dot handle to reorder or move it to another group. Use
+**Group and color** in the card menu to organize entries. Layout preferences are
+stored locally for the current Windows user.
+
 ## 1.7.0
 
 - 搜索支持同时输入服务名和账号中的关键词，也能匹配大小写、重音和全角差异。

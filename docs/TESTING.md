@@ -27,8 +27,8 @@ Private contents must still lock while already copied text remains available.
 | Check | Coverage |
 | --- | --- |
 | Core suite | 73 checks: RFC 6238, Base32/URI validation, encryption/tamper handling, atomic storage, five-digit master password, protection-transfer order and rollback |
-| Windows suite | 195 checks covering storage, private unlocking, clipboard persistence, tray and window restoration, search, type filters, keyboard copy and IME composition |
-| Localization validator | 239 message IDs in four translated catalogs with checks for matching IDs, format placeholders and native file-dialog filter pairs |
+| Windows suite | 208 checks covering storage, private unlocking, clipboard persistence, tray and window restoration, search, type filters, keyboard copy, IME composition and card layout persistence |
+| Localization validator | 254 message IDs in four translated catalogs with checks for matching IDs, format placeholders and native file-dialog filter pairs |
 | Installer smoke suite | Per-user deployment/registry, running-app replacement block, version upgrade with one uninstall entry, byte-preserved account files/settings, uninstall and retained data |
 | Visual review | Light/dark home, all five languages at narrow size, settings and first-use warning; synthetic accounts only |
 
@@ -52,6 +52,10 @@ Version 1.7.0 adds 19 desktop checks for multiscript search, type filters and
 keyboard copy. They exercise WinForms command processing and paste into a separate
 text box. They cover ambiguous results, a query change before a queued copy runs,
 IME composition, and cancellation or completion of private unlocking.
+
+Version 1.8.0 adds desktop checks for card layout, the locked card appearance
+menu, clipboard preservation, and restoring groups, colors and order after
+restart. Native mouse dragging was checked both within and across groups.
 
 The [Windows workflow](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml)
 runs the core and desktop suites, validates translations, builds both packages,
