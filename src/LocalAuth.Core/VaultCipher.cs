@@ -94,13 +94,15 @@ public sealed class OpenVault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var plaintext = JsonSerializer.SerializeToUtf8Bytes(Document.Validate(), VaultCipher.JsonOptions);
-        var nonce = RandomNumberGenerator.GetBytes(12);
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
         try
         {
+            // Base64 expansion alone would make this vault unreadable at the file limit.
+            if (plaintext.Length > VaultCipher.MaxFileSize / 4 * 3) throw new FormatException("加密数据过大，请减少条目或缩短文本。");
+            var nonce = RandomNumberGenerator.GetBytes(12);
+            var ciphertext = new byte[plaintext.Length];
+            var tag = new byte[16];
             using (var aes = new AesGcm(_key, 16)) aes.Encrypt(nonce, plaintext, ciphertext, tag, VaultCipher.AssociatedData);
-            return JsonSerializer.SerializeToUtf8Bytes(new VaultCipher.Envelope
+            var encrypted = JsonSerializer.SerializeToUtf8Bytes(new VaultCipher.Envelope
             {
                 Iterations = _iterations,
                 Salt = Convert.ToBase64String(_salt),
@@ -108,6 +110,8 @@ public sealed class OpenVault : IDisposable
                 Ciphertext = Convert.ToBase64String(ciphertext),
                 Tag = Convert.ToBase64String(tag)
             }, VaultCipher.JsonOptions);
+            if (encrypted.Length > VaultCipher.MaxFileSize) throw new FormatException("加密数据过大，请减少条目或缩短文本。");
+            return encrypted;
         }
         finally { CryptographicOperations.ZeroMemory(plaintext); }
     }

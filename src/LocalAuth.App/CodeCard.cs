@@ -44,7 +44,7 @@ internal sealed class CodeCard : Control
             _showCopied = false;
             Invalidate();
         }
-        if (IsLocked || Account.IsPassword) return;
+        if (IsLocked || !Account.IsTotp) return;
         var remaining = Totp.Remaining(Account, now);
         var counter = now.ToUnixTimeSeconds() / Account.Period;
         var changed = counter != _counter;
@@ -134,9 +134,9 @@ internal sealed class CodeCard : Control
         TextRenderer.DrawText(g, "⋯", actionFont,
             new Rectangle(Width - S(40), S(8), S(32), S(36)), Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         using var codeFont = new Font(IsLocked ? "Microsoft YaHei UI" : "Consolas", IsLocked ? 15 : 26, FontStyle.Bold);
-        var grouped = IsLocked ? "私密内容" : Account.IsPassword ? "••••••••" : _code.Insert(_code.Length / 2, " ");
+        var grouped = IsLocked ? "私密内容" : Account.IsText ? "TXT" : Account.IsPassword ? "••••••••" : _code.Insert(_code.Length / 2, " ");
         TextRenderer.DrawText(g, UiText.T(grouped), codeFont,
-            new Rectangle(S(16), S(64), Width - S(112), S(43)), IsLocked ? Theme.Muted : !Account.IsPassword && _remaining <= 5 ? Theme.Warning : Theme.Accent,
+            new Rectangle(S(16), S(64), Width - S(112), S(43)), IsLocked ? Theme.Muted : Account.IsTotp && _remaining <= 5 ? Theme.Warning : Theme.Accent,
             TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter);
         using var copyPath = Theme.Rounded(new RectangleF(Width - S(100), S(68), S(80), S(27)), S(6));
         using var copyBrush = new SolidBrush(Theme.AccentLight);
@@ -144,11 +144,11 @@ internal sealed class CodeCard : Control
         TextRenderer.DrawText(g, UiText.T(_showCopied ? "已复制" : IsLocked ? "解锁复制" : "点击复制"), detailFont,
             new Rectangle(Width - S(100), S(68), S(80), S(27)), Theme.Accent,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        TextRenderer.DrawText(g, IsLocked ? UiText.T("已锁定") : Account.IsPassword ? UiText.T(_isPrivate ? "私密密码" : "密码") : UiText.F("{0} 秒", _remaining), detailFont,
+        TextRenderer.DrawText(g, IsLocked ? UiText.T("已锁定") : Account.IsText ? UiText.T("纯文本") : Account.IsPassword ? UiText.T(_isPrivate ? "私密密码" : "密码") : UiText.F("{0} 秒", _remaining), detailFont,
             new Rectangle(Width - S(170), S(98), S(147), S(19)), Theme.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
-        if (IsLocked || Account.IsPassword) return;
+        if (IsLocked || !Account.IsTotp) return;
         using var track = new Pen(Theme.AccentLight, S(3)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-        using var progress = new Pen(!Account.IsPassword && _remaining <= 5 ? Color.FromArgb(207, 159, 82) : Color.FromArgb(89, 161, 136), S(3)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var progress = new Pen(Account.IsTotp && _remaining <= 5 ? Color.FromArgb(207, 159, 82) : Color.FromArgb(89, 161, 136), S(3)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         g.DrawLine(track, S(18), Height - S(12), Width - S(18), Height - S(12));
         var progressWidth = (Width - S(36)) * ((float)_remaining / Account.Period);
         g.DrawLine(progress, S(18), Height - S(12), S(18) + progressWidth, Height - S(12));

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.9.0
+
+- 「添加条目」新增纯文本 TXT。编辑窗口可拉大或最大化，支持多行、缩进和 Ctrl+S 保存。
+- 首页点一下 TXT 卡片即可复制全文。文本条目可筛选、收藏、分组、配色或设为私密。
+- 每条正文支持最多约 26 万字符。保存和复制保留换行及首尾空格。
+- 含纯文本的加密数据可用 1.9.0 或更新版本打开。保存前检查加密文件大小，避免覆盖为无法读取的文件。
+
+Add resizable plain-text entries with multiline editing and full-content copy.
+Text entries work with the same grouping, colors, favorites and private unlocking
+as other entries. Version 1.9.0 opens existing vaults and adds support for encrypted
+vaults and backups containing text.
+
 ## 1.8.0
 
 - 拖动卡片右上角的六点把手，可调整顺序或把条目移到另一组。

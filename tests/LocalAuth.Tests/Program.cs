@@ -143,4 +143,29 @@ Throws<FormatException>(() => EntryTransfer.Move(sample, sourceEntries, destinat
 Throws<FormatException>(() => EntryTransfer.Move(sample, [], [],
     _ => throw new Exception("must not write"), _ => throw new Exception("must not write")), "missing source entry rejected before writing");
 
+var noteBody = "  first line  \r\n\t中文・日本語 🌙\r\n\r\n  last line  ";
+var note = new Account { Kind = "Text", Issuer = "Text fixture", Secret = noteBody };
+Check(note.Normalize().Secret == noteBody, "text preserves Unicode, line breaks and edge whitespace");
+Check(note.SameCredential(note) && !note.SameCredential(note with { Issuer = "Other title" }), "duplicate notes distinguish titles");
+Throws<FormatException>(() => (note with { Secret = "" }).Normalize(), "empty text is rejected");
+Throws<FormatException>(() => (note with { Secret = "line\0line" }).Normalize(), "null characters are rejected before clipboard copy");
+Throws<FormatException>(() => (note with { Secret = new string('x', Account.MaxTextLength + 1) }).Normalize(), "text size limit is enforced");
+using (var mixed = VaultCipher.Create("13579", new VaultDocument { Accounts = [sample, note] }))
+{
+    using var restored = VaultCipher.Open(mixed.Seal(), "13579");
+    Check(restored.Document.Version == 3 && restored.Document.Accounts[1].Secret == noteBody, "mixed encrypted backup round trips plain text");
+    var folder = Path.Combine(Path.GetTempPath(), "AuthLocal-text-size-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new VaultStore(Path.Combine(folder, "accounts.vault"));
+        store.Save(mixed);
+        var saved = store.Read();
+        var large = new string('文', Account.MaxTextLength);
+        mixed.Document = new VaultDocument { Accounts = Enumerable.Range(0, 9).Select(_ => note with { Id = Guid.NewGuid(), Secret = large }).ToList() };
+        Throws<FormatException>(() => store.Save(mixed), "oversized encrypted text data is rejected before replacing the file");
+        Check(saved.SequenceEqual(store.Read()), "failed size check preserves the previous vault");
+    }
+    finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+}
+
 Console.WriteLine($"\nAll {passed} checks passed.");

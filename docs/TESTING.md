@@ -26,9 +26,9 @@ Private contents must still lock while already copied text remains available.
 
 | Check | Coverage |
 | --- | --- |
-| Core suite | 73 checks: RFC 6238, Base32/URI validation, encryption/tamper handling, atomic storage, five-digit master password, protection-transfer order and rollback |
-| Windows suite | 208 checks covering storage, private unlocking, clipboard persistence, tray and window restoration, search, type filters, keyboard copy, IME composition and card layout persistence |
-| Localization validator | 254 message IDs in four translated catalogs with checks for matching IDs, format placeholders and native file-dialog filter pairs |
+| Core suite | 81 checks: RFC 6238, Base32/URI validation, encryption/tamper handling, atomic storage, five-digit master password, protection-transfer order and rollback |
+| Windows suite | 219 checks covering storage, private unlocking, clipboard persistence, tray and window restoration, search, type filters, keyboard copy, IME composition and card layout persistence |
+| Localization validator | 264 message IDs in four translated catalogs with checks for matching IDs, format placeholders and native file-dialog filter pairs |
 | Installer smoke suite | Per-user deployment/registry, running-app replacement block, version upgrade with one uninstall entry, byte-preserved account files/settings, uninstall and retained data |
 | Visual review | Light/dark home, all five languages at narrow size, settings and first-use warning; synthetic accounts only |
 
@@ -56,6 +56,10 @@ IME composition, and cancellation or completion of private unlocking.
 Version 1.8.0 adds desktop checks for card layout, the locked card appearance
 menu, clipboard preservation, and restoring groups, colors and order after
 restart. Native mouse dragging was checked both within and across groups.
+
+Version 1.9.0 tests long multiline text in the resizable editor, exact clipboard
+copy and paste, reopening, editing, private unlocking and size limits. A failed
+oversized save must preserve the previous encrypted file.
 
 The [Windows workflow](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml)
 runs the core and desktop suites, validates translations, builds both packages,

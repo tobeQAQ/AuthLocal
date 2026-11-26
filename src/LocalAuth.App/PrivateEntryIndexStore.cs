@@ -6,7 +6,7 @@ using LocalAuth.Core;
 namespace LocalAuth.App;
 
 // This cache is deliberately limited to names, types, IDs and favorites.
-// Passwords, OTP seeds and vault keys never enter the automatically opened index.
+// Passwords, OTP seeds, text contents and vault keys never enter this index.
 internal sealed record PrivateEntryInfo
 {
     public Guid Id { get; init; }
@@ -33,7 +33,7 @@ internal sealed record PrivateEntryIndex
     {
         if (Version != 1 || VaultFingerprint is null || VaultFingerprint.Length != 64 || Entries is null || Entries.Count > 10000 ||
             Entries.Any(e => e is null || e.Id == Guid.Empty || e.Issuer is null || e.Name is null ||
-                e.Issuer.Length > 120 || e.Name.Length > 200 || (e.Issuer.Length == 0 && e.Name.Length == 0) || e.Kind is not ("TOTP" or "Password")) ||
+                e.Issuer.Length > 120 || e.Name.Length > 200 || (e.Issuer.Length == 0 && e.Name.Length == 0) || e.Kind is not ("TOTP" or "Password" or "Text")) ||
             Entries.Select(e => e.Id).Distinct().Count() != Entries.Count)
             throw new FormatException("首页私密列表无效，请解锁后重新同步。");
     }

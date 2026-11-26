@@ -21,14 +21,20 @@ Supports Windows 10 1809 / Windows 11 x64. Packages include the .NET runtime.
 Obtain releases from [Releases](https://github.com/tobeQAQ/AuthLocal/releases), or
 packages from successful [Windows Actions runs](https://github.com/tobeQAQ/AuthLocal/actions/workflows/windows.yml).
 
-- `AuthLocal-1.8.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
-- `AuthLocal-1.8.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
-- `AuthLocal-1.8.0-windows-x64-SHA256SUMS.txt`: download checksums.
+- `AuthLocal-1.9.0-windows-x64-setup.exe`: per-user install, Start menu shortcut and standard uninstall registration.
+- `AuthLocal-1.9.0-windows-x64-portable.zip`: extract and run `AuthLocal.exe`.
+- `AuthLocal-1.9.0-windows-x64-SHA256SUMS.txt`: download checksums.
 
 The portable package still keeps data in the current Windows user's application
 data directory. Binaries are currently unsigned.
 
 ## Use
+
+Choose **Add entry → New plain text** to create a TXT card. Resize or maximize
+its editor for longer text, and press Ctrl+S to save. Click the card to copy
+its complete contents, including line breaks and surrounding spaces. The limit
+is 262,144 UTF-16 code units per entry. Encrypted data with text entries opens
+in version 1.9.0 or later.
 
 Add a TOTP entry with a manual secret, `otpauth://` URI or QR image, or add a saved
 password. Click its card to copy. Passwords are masked by default. Letters,
@@ -62,7 +68,7 @@ and Simplified Chinese, Traditional Chinese, English, French and Japanese. Langu
 follows Windows by default; unsupported languages fall back to English.
 
 Use Ctrl+F to search by service and account keywords separated by spaces. The type
-menu narrows results to codes or passwords. Enter copies a single search result.
+menu narrows results to codes, passwords or text. Enter copies a single search result.
 When several cards match, use ↑ or ↓ to select one and then press Enter. Esc clears
 the query. Ctrl+N adds a TOTP entry and Ctrl+L locks private content.
 Drag a card by its six-dot handle and drop it on the left or right half of

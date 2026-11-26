@@ -71,7 +71,7 @@ public static class Totp
 {
     public static string Generate(Account account, DateTimeOffset time)
     {
-        if (account.Period < 5 || account.Period > 300 || account.Digits is not (6 or 8))
+        if (!account.IsTotp || account.Period < 5 || account.Period > 300 || account.Digits is not (6 or 8))
             throw new ArgumentException("验证码参数无效。");
         var seconds = time.ToUnixTimeSeconds();
         if (seconds < 0) throw new ArgumentOutOfRangeException(nameof(time));

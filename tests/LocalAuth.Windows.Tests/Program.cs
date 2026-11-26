@@ -105,7 +105,7 @@ internal static partial class Program
         Check(ReadClipboard() == emptyClipboard && Call(legacy, "FindAvailable", otp.Id) is null, "stale private card cannot copy after lock");
         var openedLockedEditor = false;
         using (var cancel = CancelPasswordDialog("EntryDialog", () => openedLockedEditor = true))
-            await (Task)Call(legacy, "EditAccountAsync", otp, false)!;
+            await (Task)Call(legacy, "EditAccountAsync", otp, "TOTP")!;
         Check(!openedLockedEditor, "queued edit of a stale private entry cannot expose contents after locking");
         var protectedRestart = CreateForm(oldDirectory); protectedRestart.Show();
         Check(CardCount(protectedRestart) == 0 && Get<VaultDocument>(protectedRestart, "_ordinary").Accounts.Count == 0, "protected entry stays hidden after restart");
@@ -194,6 +194,7 @@ internal static partial class Program
         await RunConvenienceChecks();
         await RunSearchChecks();
         await RunLayoutChecks();
+        await RunTextEntryChecks();
         // DPAPI corruption must reject without overwriting the original bytes.
         File.WriteAllBytes(ordinaryPath, new byte[] { 0, 1, 2, 3 });
         try

@@ -7,7 +7,7 @@ namespace LocalAuth.App;
 
 internal sealed partial class MainForm : Form
 {
-    private enum EntryType { All, Codes, Passwords }
+    private enum EntryType { All, Codes, Passwords, Text }
 
     private readonly VaultStore _store;
     private readonly QuickAccessStore _ordinaryStore;
@@ -330,7 +330,8 @@ internal sealed partial class MainForm : Form
         };
         var addMenu = Theme.Menu();
         addMenu.Items.Add("动态验证码（手动 / 二维码）", null, async (_, _) => await EditAccountAsync());
-        addMenu.Items.Add("保存密码", null, async (_, _) => await EditAccountAsync(passwordEntry: true));
+        addMenu.Items.Add("保存密码", null, async (_, _) => await EditAccountAsync(kind: "Password"));
+        addMenu.Items.Add("新建纯文本", null, async (_, _) => await EditAccountAsync(kind: "Text"));
         add.Disposed += (_, _) => addMenu.Dispose();
         add.Click += (_, _) => { UiText.Apply(addMenu); addMenu.Show(add, new Point(0, add.Height)); };
         _search = Scaled(new SearchBox
@@ -479,7 +480,7 @@ internal sealed partial class MainForm : Form
         var terms = (_search?.Text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var focusedId = _cards.Controls.OfType<CodeCard>().FirstOrDefault(card => card.Focused)?.Account.Id;
         var visible = OrderedEntries().Where(e => (!_privateView || e.Private) && (!_favoritesOnly || e.Account.Favorite) &&
-                (_entryType == EntryType.All || e.Account.IsPassword == (_entryType == EntryType.Passwords)) &&
+                MatchesEntryType(e.Account) &&
                 MatchesSearch(e.Account, terms)).ToList();
         _subtitle!.Text = UiText.F("{0} · {1} 项", UiText.T(_privateView ? "私密" : _favoritesOnly ? "收藏" : "全部"), visible.Count);
         if (_typeButton is not null) _typeButton.Text = TypeName(_entryType) + " ▼";
@@ -553,10 +554,19 @@ internal sealed partial class MainForm : Form
         }
     }
 
+    private bool MatchesEntryType(Account account) => _entryType switch
+    {
+        EntryType.Codes => account.IsTotp,
+        EntryType.Passwords => account.IsPassword,
+        EntryType.Text => account.IsText,
+        _ => true
+    };
+
     private static string TypeName(EntryType type) => UiText.T(type switch
     {
         EntryType.Codes => "仅验证码",
         EntryType.Passwords => "仅密码",
+        EntryType.Text => "仅纯文本",
         _ => "全部类型"
     });
 
@@ -600,9 +610,14 @@ internal sealed partial class MainForm : Form
         if (available is null) return false;
         try
         {
-            _clipboard.Copy(available.IsPassword ? available.Secret : Totp.Generate(available, DateTimeOffset.UtcNow), Handle);
+            _clipboard.Copy(available.IsTotp ? Totp.Generate(available, DateTimeOffset.UtcNow) : available.Secret, Handle);
             _cards?.Controls.OfType<CodeCard>().FirstOrDefault(c => c.Account.Id == available.Id)?.ShowCopied();
-            Toast(available.IsPassword ? "密码已复制，可直接切换窗口粘贴。" : "验证码已复制，可直接切换窗口粘贴。");
+            Toast(available.Kind switch
+            {
+                "Text" => "全文已复制，可直接切换窗口粘贴。",
+                "Password" => "密码已复制，可直接切换窗口粘贴。",
+                _ => "验证码已复制，可直接切换窗口粘贴。"
+            });
             return true;
         }
         catch (System.Runtime.InteropServices.ExternalException) { ShowError("剪贴板正被其他程序使用，请稍后再试。"); }
@@ -664,7 +679,7 @@ internal sealed partial class MainForm : Form
         menu.Show(location);
     }
 
-    private async Task EditAccountAsync(Account? account = null, bool passwordEntry = false)
+    private async Task EditAccountAsync(Account? account = null, string kind = "TOTP")
     {
         if (_busy) return;
         if (account is not null)
@@ -676,16 +691,25 @@ internal sealed partial class MainForm : Form
         var wasPrivate = account is not null && IsPrivate(account);
         Account? result;
         bool protect;
-        if (passwordEntry || account?.IsPassword == true)
+        var requireUnlock = account is null ? _privateView : wasPrivate;
+        kind = account?.Kind ?? kind;
+        if (kind == "Text")
         {
-            using var dialog = new StoredPasswordDialog(account, account is null ? _privateView : wasPrivate);
+            using var dialog = new TextEntryDialog(account, requireUnlock);
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            result = dialog.Result;
+            protect = dialog.RequireUnlock;
+        }
+        else if (kind == "Password")
+        {
+            using var dialog = new StoredPasswordDialog(account, requireUnlock);
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             result = dialog.Result;
             protect = dialog.RequireUnlock;
         }
         else
         {
-            using var dialog = new EntryDialog(account, account is null ? _privateView : wasPrivate);
+            using var dialog = new EntryDialog(account, requireUnlock);
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             result = dialog.Result;
             protect = dialog.RequireUnlock;
@@ -710,8 +734,17 @@ internal sealed partial class MainForm : Form
             else accounts.Add(result);
             if (!Commit(accounts, protect)) return;
         }
-        _privateView = false;
-        RenderCards();
+        if (account is null && result.IsText)
+        {
+            ResetHome();
+            var newCard = _cards?.Controls.OfType<CodeCard>().FirstOrDefault(c => c.Account.Id == result.Id);
+            if (newCard is not null) _cards?.ScrollControlIntoView(newCard);
+        }
+        else
+        {
+            _privateView = false;
+            RenderCards();
+        }
         Toast(protect ? "已加密保存到私密区。" : "已保存到普通区，打开即可直接使用。");
     }
 

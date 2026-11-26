@@ -4,8 +4,13 @@ namespace LocalAuth.Core;
 
 public sealed record Account
 {
+    public const int MaxTextLength = 262144;
     public string Kind { get; init; } = "TOTP";
     public bool IsPassword => Kind == "Password";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsText => Kind == "Text";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsTotp => Kind == "TOTP";
     public Guid Id { get; init; } = Guid.NewGuid();
     public string Issuer { get; init; } = "";
     public string Name { get; init; } = "";
@@ -19,12 +24,18 @@ public sealed record Account
     {
         if (Issuer is null || Name is null || Secret is null || Algorithm is null)
             throw new FormatException("账户数据缺少必要字段。");
-        if (Kind is not ("TOTP" or "Password")) throw new FormatException("不支持的条目类型。");
+        if (Kind is not ("TOTP" or "Password" or "Text")) throw new FormatException("不支持的条目类型。");
         if (Id == Guid.Empty) throw new FormatException("账户标识无效。");
         var issuer = Issuer.Trim();
         var name = Name.Trim();
         if (issuer.Length == 0 && name.Length == 0) throw new FormatException("请填写服务名称或账户名称。");
         if (issuer.Length > 120 || name.Length > 200) throw new FormatException("名称过长，请缩短后重试。");
+        if (IsText)
+        {
+            if (Secret.Length == 0 || Secret.Length > MaxTextLength || Secret.Contains('\0'))
+                throw new FormatException("正文不能为空、含空字符或超过 262144 个字符。");
+            return this with { Issuer = issuer, Name = name };
+        }
         if (IsPassword)
         {
             if (Secret.Length == 0 || Secret.Length > 16384 || Secret.Contains('\0')) throw new FormatException("密码不能为空、含空字符或超过 16384 个字符。");
@@ -42,7 +53,8 @@ public sealed record Account
     }
 
     public bool SameCredential(Account other) =>
-        Kind == other.Kind && (!IsPassword || (Issuer == other.Issuer && Name == other.Name)) && Secret == other.Secret && Algorithm == other.Algorithm && Digits == other.Digits && Period == other.Period;
+        Kind == other.Kind && (IsTotp || (Issuer == other.Issuer && Name == other.Name)) && Secret == other.Secret &&
+        (IsText || (Algorithm == other.Algorithm && Digits == other.Digits && Period == other.Period));
 }
 
 public sealed record VaultDocument
@@ -52,12 +64,13 @@ public sealed record VaultDocument
 
     public VaultDocument Validate()
     {
-        if (Version is not (1 or 2)) throw new FormatException("此数据版本暂不支持。");
+        if (Version is not (1 or 2 or 3)) throw new FormatException("此数据版本暂不支持。");
         if (Accounts is null || Accounts.Count > 10000) throw new FormatException("账户数据无效或数量过多。");
         if (Accounts.Any(a => a is null)) throw new FormatException("账户数据无效。");
         var accounts = Accounts.Select(a => a.Normalize()).ToList();
         if (accounts.Select(a => a.Id).Distinct().Count() != accounts.Count)
             throw new FormatException("账户标识重复，无法打开数据。");
-        return this with { Accounts = accounts, Version = accounts.Any(a => a.IsPassword) ? 2 : Version };
+        var version = accounts.Any(a => a.IsText) ? 3 : Version == 2 || accounts.Any(a => a.IsPassword) ? 2 : 1;
+        return this with { Accounts = accounts, Version = version };
     }
 }
